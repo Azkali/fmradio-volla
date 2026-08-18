@@ -11,5 +11,5 @@
     },
     "version": "1.0.0",
     "maintainer": "venji10 <bennisteinir@gmail.com>",
-    "framework" : "ubuntu-sdk-20.04"
+    "framework": "ubuntu-touch-24.04-1.x"
 }

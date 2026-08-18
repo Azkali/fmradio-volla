@@ -3,4 +3,5 @@
   "builder": "cmake",
   "kill": "fmradio",
   "skip_review": true,
+  "framework": "ubuntu-touch-24.04-1.x"
 }
