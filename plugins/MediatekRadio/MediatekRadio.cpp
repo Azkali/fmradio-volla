@@ -22,6 +22,12 @@
 #include <string.h>
 #include <iostream>
 #include <thread>
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <vector>
+#include <initializer_list>
+
 
 #include "MediatekRadio.h"
 #include "common.cpp"
@@ -33,77 +39,117 @@
 #define FM_BAND_JAPANW  3 // Japan wideband  76MHZ   ~ 108MHz
 #define FM_BAND_SPECIAL 4 // special   band  between 76MHZ   and  108MHz
 
+// ---------------------------------------------------------------------------
+// PulseAudio helpers
+//
+// Node names differ between pulseaudio-modules-droid releases:
+//   legacy (Halium 9/10):  source.droid          / sink.droid
+//   newer  (Halium 11+):   source.primary_input  / sink.primary_output
+// so probe them once instead of hardcoding.
+// ---------------------------------------------------------------------------
+
+// Run a shell command and return its stdout, one line per element.
+static std::vector<std::string> runLines(const std::string &cmd)
+{
+	std::vector<std::string> lines;
+	FILE *fp = popen(cmd.c_str(), "r");
+	if (!fp)
+		return lines;
+
+	char buf[256];
+	while (fgets(buf, sizeof buf, fp)) {
+		buf[strcspn(buf, "\n")] = '\0';
+		lines.emplace_back(buf);
+	}
+	pclose(fp);
+	return lines;
+}
+
+// Pick the first existing PulseAudio node name from a candidate list.
+// kind is "sources" or "sinks".
+static std::string findNode(const char *kind, std::initializer_list<const char *> candidates)
+{
+	const auto names = runLines(std::string("/usr/bin/pactl list short ") + kind + " | /usr/bin/awk '{ print $2 }'");
+	for (const char *c : candidates)
+		for (const auto &n : names)
+			if (n == c)
+				return n;
+	// nothing matched; fall back to the first candidate so the error is visible in logs
+	return *candidates.begin();
+}
+
+static const std::string &paSource()
+{
+	static const std::string s = findNode("sources", {"source.primary_input", "source.droid"});
+	return s;
+}
+
+static const std::string &paSink()
+{
+	static const std::string s = findNode("sinks", {"sink.primary_output", "sink.droid"});
+	return s;
+}
+
+static int sh(const std::string &cmd)
+{
+	return system(cmd.c_str());
+}
 
 MediatekRadio::MediatekRadio() {
 
 }
-// check if headset/headphones are connected, they are act as antenna
+
+// check if headset/headphones are connected, they act as antenna
 bool MediatekRadio::isHeadsetAvailable() {
 
-	FILE *fp;
-	char path[45];
+	isHeadset = false;
 
-	fp = popen("/usr/bin/pactl list sinks | /bin/grep \"Active Port:\"", "r");
+	const auto ports = runLines(
+		"/usr/bin/pactl list sinks | "
+		"/usr/bin/awk '/^Sink #/ { droid = 0 } /Name: " + paSink() + "$/ { droid = 1 } droid && /Active Port:/ { print $3 }'");
 
-	if(fp == NULL) {
-		printf("error checking for headset");
-		return false;
-	}
-
-
-
-	while (fgets(path, sizeof(path), fp) != NULL) {
-		printf("%s", path);
-	}
-
-	printf("\n");
-
-	pclose(fp);
-
-	if(strcmp(path, "	Active Port: output-wired_headset") < 0) {
-		printf("not using headset\n");
-
-		if(!strcmp(path, "	Active Port: output-wired_headphone") < 0) {
+	for (const auto &port : ports) {
+		if (port == "output-wired_headset") {
+			isHeadset = true;   // headset with mic: restore input-wired_headset on stop
 			return true;
 		}
-
-		return false;
-
+		if (port == "output-wired_headphone")
+			return true;
 	}
-
-	isHeadset = true;
-	return true;
-
+	return false;
 }
 
 // This is needed to route the FM input to the headphones
 void MediatekRadio::preparePulseAudio() {
 
-	int ret;
-
-	ret = system("pacmd set-source-port source.droid input-fm_tuner");
-	ret = system("pactl load-module module-loopback source=source.droid sink=sink.primary_output");
+	sh("pacmd set-source-port " + paSource() + " input-fm_tuner");
+	sh("pactl load-module module-loopback source=" + paSource() + " sink=" + paSink());
 
 }
 
 bool MediatekRadio::isRadioRunning() {
 
-        return radioRunning;
+	return radioRunning;
 
 }
 
 // Volume is always at 100% without this
 void MediatekRadio::startVolumeUpdater() {
 
-	system("touch ~/.radioRunning");
-	system("while ( test -f ~/.radioRunning) do $(pactl set-source-volume source.droid $(printf \"%.*f\\n\" 0 $(echo print $(dbus-send --session --type=method_call --print-reply --dest=org.ayatana.indicator.sound /org/ayatana/indicator/sound org.gtk.Actions.DescribeAll | grep -A5 \"string \\\"volume\\\"\" | grep double | cut -b 49-52)*65536 | perl))); done &");
+	sh("touch ~/.radioRunning");
+	sh("while ( test -f ~/.radioRunning ) do "
+	   "pactl set-source-volume " + paSource() + " "
+	   "$(printf \"%.*f\\n\" 0 $(echo print $(dbus-send --session --type=method_call --print-reply "
+	   "--dest=org.ayatana.indicator.sound /org/ayatana/indicator/sound org.gtk.Actions.DescribeAll "
+	   "| grep -A5 \"string \\\"volume\\\"\" | grep double | cut -b 49-52)*65536 | perl)); "
+	   "sleep 0.5; done &");
 
 }
 
 void MediatekRadio::stopVolumeUpdater() {
 
-	system("rm ~/.radioRunning");
-	system("pactl set-source-volume source.droid 65536"); // 100%
+	sh("rm -f ~/.radioRunning");
+	sh("pactl set-source-volume " + paSource() + " 65536"); // 100%
 
 }
 
@@ -154,9 +200,9 @@ QByteArray MediatekRadio::stopRadio() {
 	ret = system("pactl unload-module module-loopback");
 
 	if(isHeadset) {
-		ret = system("pacmd set-source-port source.droid input-wired_headset && pacmd set-sink-port sink.primary_output output-wired_headset");
+		ret = sh("pacmd set-source-port " + paSource() + " input-wired_headset && pacmd set-sink-port " + paSink() + " output-wired_headset");
 	} else {
-		ret = system("pacmd set-source-port source.droid input-builtin_mic && pacmd set-sink-port sink.primary_output output-wired_headphone");
+		ret = sh("pacmd set-source-port " + paSource() + " input-builtin_mic && pacmd set-sink-port " + paSink() + " output-wired_headphone");
 	}
 
 	stopVolumeUpdater();
