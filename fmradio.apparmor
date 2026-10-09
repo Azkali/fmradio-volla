@@ -1,5 +1,6 @@
 {
-    "policy_groups": [],
-    "policy_version": 2404.1,
-    "template": "unconfined"
+    "policy_groups": [
+        "audio"
+    ],
+    "policy_version": 2404.1
 }
