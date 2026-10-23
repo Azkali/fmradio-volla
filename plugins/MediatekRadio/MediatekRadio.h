@@ -25,6 +25,7 @@ class MediatekRadio : public QObject {
 	Q_OBJECT
 	Q_PROPERTY(bool running READ isRadioRunning NOTIFY runningChanged)
 	Q_PROPERTY(int frequency READ getFrequency NOTIFY frequencyChanged)
+	Q_PROPERTY(bool speakerOutput READ isSpeakerOutput WRITE setSpeakerOutput NOTIFY speakerOutputChanged)
 
 public:
 	explicit MediatekRadio(QObject *parent = nullptr);
@@ -37,10 +38,13 @@ public:
 	Q_INVOKABLE int seekUp();
 	Q_INVOKABLE int seekDown();
 	Q_INVOKABLE bool isRadioRunning() const;
+	Q_INVOKABLE bool isSpeakerOutput() const;
+	Q_INVOKABLE void setSpeakerOutput(bool speaker);
 
 signals:
 	void runningChanged();
 	void frequencyChanged();
+	void speakerOutputChanged();
 
 private:
 	int seek(bool up);
@@ -58,6 +62,7 @@ private:
 	QString savedSinkPort;
 	QString loopbackModule;
 	bool running = false;
+	bool speakerOutput = false;
 	int frequency;
 	int fd = -1;
 };

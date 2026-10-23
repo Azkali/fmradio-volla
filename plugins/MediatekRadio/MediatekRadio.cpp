@@ -112,6 +112,8 @@ void MediatekRadio::routeAudio()
 	savedSinkPort = activePort("sinks", paSink);
 
 	pactl({"set-source-port", paSource, "input-fm_tuner"});
+	if (speakerOutput)
+		pactl({"set-sink-port", paSink, "output-speaker"});
 
 	// The multimedia role makes the loopback follow the system media volume
 	loopbackModule = pactl({"load-module", "module-loopback",
@@ -265,4 +267,21 @@ int MediatekRadio::getRssi()
 	}
 
 	return rssi;
+}
+
+bool MediatekRadio::isSpeakerOutput() const
+{
+	return speakerOutput;
+}
+
+void MediatekRadio::setSpeakerOutput(bool speaker)
+{
+	if (speakerOutput == speaker)
+		return;
+
+	speakerOutput = speaker;
+	if (running)
+		pactl({"set-sink-port", paSink, speaker ? "output-speaker" : savedSinkPort});
+
+	emit speakerOutputChanged();
 }
