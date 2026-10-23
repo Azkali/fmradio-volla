@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: fmradio.venji10\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-02 13:41+0000\n"
+"POT-Creation-Date: 2026-10-23 12:18+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,18 +17,22 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: ../qml/Main.qml:39 fmradio.desktop.in.h:1
+#: ../qml/pages/HomePage.qml:14 fmradio.desktop.in.h:1
 msgid "FM Radio"
 msgstr ""
 
-#: ../qml/Main.qml:66
-msgid "<"
+#: ../qml/pages/HomePage.qml:394
+msgid "98.5"
 msgstr ""
 
-#: ../qml/Main.qml:80
-msgid ">"
+#: ../qml/pages/HomePage.qml:408
+msgid "101.1"
 msgstr ""
 
-#: ../qml/Main.qml:94
-msgid "Start radio"
+#: ../qml/pages/HomePage.qml:419
+msgid "102.5"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:14
+msgid "Radio Settings"
 msgstr ""
