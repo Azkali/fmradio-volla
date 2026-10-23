@@ -26,8 +26,20 @@ class MediatekRadio : public QObject {
 	Q_PROPERTY(bool running READ isRadioRunning NOTIFY runningChanged)
 	Q_PROPERTY(int frequency READ getFrequency NOTIFY frequencyChanged)
 	Q_PROPERTY(bool speakerOutput READ isSpeakerOutput WRITE setSpeakerOutput NOTIFY speakerOutputChanged)
+	Q_PROPERTY(bool headsetAntenna READ isHeadsetAntenna WRITE setHeadsetAntenna NOTIFY headsetAntennaChanged)
+	Q_PROPERTY(bool mono READ isMono WRITE setMono NOTIFY monoChanged)
+	Q_PROPERTY(Region region READ getRegion WRITE setRegion NOTIFY regionChanged)
+	Q_PROPERTY(QString devicePath READ getDevicePath CONSTANT)
+	Q_PROPERTY(QString chipName READ getChipName NOTIFY runningChanged)
 
 public:
+	// Both use 87.5 - 108 MHz, they only differ in de-emphasis
+	enum Region {
+		RegionWorld,
+		RegionAmericas
+	};
+	Q_ENUM(Region)
+
 	explicit MediatekRadio(QObject *parent = nullptr);
 	~MediatekRadio();
 
@@ -43,16 +55,31 @@ public:
 	Q_INVOKABLE bool isSpeakerOutput() const;
 	Q_INVOKABLE void setSpeakerOutput(bool speaker);
 
+	bool isHeadsetAntenna() const;
+	void setHeadsetAntenna(bool headset);
+	bool isMono() const;
+	void setMono(bool enabled);
+	Region getRegion() const;
+	void setRegion(Region newRegion);
+	QString getDevicePath() const;
+	QString getChipName() const;
+
 signals:
 	void runningChanged();
 	void frequencyChanged();
 	void speakerOutputChanged();
+	void headsetAntennaChanged();
+	void monoChanged();
+	void regionChanged();
 
 private:
+	bool powerUp(int freq);
 	int seek(bool up);
 	int step(bool up);
 	void setFrequency(int freq);
 	void setMute(bool mute);
+	void applyAntenna();
+	void applyMono();
 	bool isHeadsetConnected();
 	void routeAudio();
 	void restoreAudio();
@@ -63,8 +90,12 @@ private:
 	QString savedSourcePort;
 	QString savedSinkPort;
 	QString loopbackModule;
+	QString chipName;
 	bool running = false;
 	bool speakerOutput = false;
+	bool headsetAntenna;
+	bool mono;
+	Region region;
 	int frequency;
 	int fd = -1;
 };

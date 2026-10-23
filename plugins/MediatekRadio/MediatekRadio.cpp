@@ -27,6 +27,9 @@
 // The driver ignores the band, its range is fixed to 87.5 - 108 MHz
 #define FM_BAND_UE      1
 
+#define FM_ANTENNA_LONG  0 // headset wire
+#define FM_ANTENNA_SHORT 1 // embedded antenna
+
 // Frequencies are in 10 kHz units
 static const int kBandMin = 8750;
 static const int kBandMax = 10800;
@@ -99,6 +102,9 @@ MediatekRadio::MediatekRadio(QObject *parent)
 		   QSettings::IniFormat),
 	  paSource(findNode("sources", {"source.primary_input", "source.droid"})),
 	  paSink(findNode("sinks", {"sink.primary_output", "sink.droid"})),
+	  headsetAntenna(settings.value("headsetAntenna", true).toBool()),
+	  mono(settings.value("mono", false).toBool()),
+	  region(static_cast<Region>(settings.value("region", RegionWorld).toInt())),
 	  frequency(settings.value("frequency", kDefaultFrequency).toInt())
 {
 }
@@ -145,12 +151,31 @@ void MediatekRadio::restoreAudio()
 		pactl({"set-sink-port", paSink, savedSinkPort});
 }
 
+// De-emphasis is only applied at power up
+bool MediatekRadio::powerUp(int freq)
+{
+	int ret = COM_pwr_up(fd, FM_BAND_UE, freq, region == RegionAmericas);
+	if (ret < 0) {
+		qWarning() << "Failed to power up:" << ret;
+		return false;
+	}
+
+	int chipId = 0;
+	if (COM_get_chip_id(fd, &chipId) == 0)
+		chipName = QString("MT%1").arg(chipId, 0, 16);
+
+	applyAntenna();
+	applyMono();
+
+	return true;
+}
+
 QByteArray MediatekRadio::startRadio(int freq)
 {
 	if (running)
 		return "Stop radio";
 
-	if (!isHeadsetConnected())
+	if (headsetAntenna && !isHeadsetConnected())
 		return "Headset not available";
 
 	int ret = COM_open_dev(FM_DEV_NAME, &fd);
@@ -159,9 +184,7 @@ QByteArray MediatekRadio::startRadio(int freq)
 		return "Error";
 	}
 
-	ret = COM_pwr_up(fd, FM_BAND_UE, freq);
-	if (ret < 0) {
-		qWarning() << "Failed to power up:" << ret;
+	if (!powerUp(freq)) {
 		COM_close_dev(fd);
 		fd = -1;
 		return "Error";
@@ -311,4 +334,87 @@ void MediatekRadio::setSpeakerOutput(bool speaker)
 		pactl({"set-sink-port", paSink, speaker ? "output-speaker" : savedSinkPort});
 
 	emit speakerOutputChanged();
+}
+
+bool MediatekRadio::isHeadsetAntenna() const
+{
+	return headsetAntenna;
+}
+
+// Only devices with an embedded antenna can use the short one
+void MediatekRadio::setHeadsetAntenna(bool headset)
+{
+	if (headsetAntenna == headset)
+		return;
+
+	headsetAntenna = headset;
+	settings.setValue("headsetAntenna", headset);
+	if (running)
+		applyAntenna();
+
+	emit headsetAntennaChanged();
+}
+
+void MediatekRadio::applyAntenna()
+{
+	int ret = COM_ana_switch(fd, headsetAntenna ? FM_ANTENNA_LONG : FM_ANTENNA_SHORT);
+	if (ret < 0)
+		qWarning() << "Failed to switch antenna:" << ret;
+}
+
+bool MediatekRadio::isMono() const
+{
+	return mono;
+}
+
+void MediatekRadio::setMono(bool enabled)
+{
+	if (mono == enabled)
+		return;
+
+	mono = enabled;
+	settings.setValue("mono", enabled);
+	if (running)
+		applyMono();
+
+	emit monoChanged();
+}
+
+void MediatekRadio::applyMono()
+{
+	int ret = COM_set_stereomono(fd, mono);
+	if (ret < 0)
+		qWarning() << "Failed to set mono:" << ret;
+}
+
+MediatekRadio::Region MediatekRadio::getRegion() const
+{
+	return region;
+}
+
+void MediatekRadio::setRegion(Region newRegion)
+{
+	if (region == newRegion)
+		return;
+
+	region = newRegion;
+	settings.setValue("region", static_cast<int>(newRegion));
+
+	if (running) {
+		COM_pwr_down(fd, 0);
+		if (!powerUp(frequency))
+			stopRadio();
+	}
+
+	emit regionChanged();
+}
+
+QString MediatekRadio::getDevicePath() const
+{
+	return FM_DEV_NAME;
+}
+
+QString MediatekRadio::getChipName() const
+{
+	return chipName;
 }

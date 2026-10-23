@@ -64,7 +64,7 @@ int COM_close_dev(int fd)
     return ret;
 }
 
-int COM_pwr_up(int fd, int band, int freq)
+int COM_pwr_up(int fd, int band, int freq, int deemphasis)
 {
     int ret = 0;
     struct fm_tune_parm parm;
@@ -76,6 +76,7 @@ int COM_pwr_up(int fd, int band, int freq)
     parm.freq = freq;
     parm.hilo = FM_AUTO_HILO_OFF;
     parm.space = FM_SEEK_SPACE;
+    parm.deemphasis = deemphasis;
 
     ret = ioctl(fd, FM_IOCTL_POWERUP, &parm);
     if (ret) {
