@@ -18,6 +18,7 @@
 #define MEDIATEKRADIO_H
 
 #include <QObject>
+#include <QProcess>
 #include <QSettings>
 #include <QString>
 #include <QTimer>
@@ -33,6 +34,7 @@ class MediatekRadio : public QObject {
 	Q_PROPERTY(bool rdsEnabled READ isRdsEnabled WRITE setRdsEnabled NOTIFY rdsEnabledChanged)
 	Q_PROPERTY(QString stationName READ getStationName NOTIFY rdsChanged)
 	Q_PROPERTY(QString radioText READ getRadioText NOTIFY rdsChanged)
+	Q_PROPERTY(bool recording READ isRecording NOTIFY recordingChanged)
 	Q_PROPERTY(QString devicePath READ getDevicePath CONSTANT)
 	Q_PROPERTY(QString chipName READ getChipName NOTIFY runningChanged)
 
@@ -58,6 +60,9 @@ public:
 	Q_INVOKABLE bool isRadioRunning() const;
 	Q_INVOKABLE bool isSpeakerOutput() const;
 	Q_INVOKABLE void setSpeakerOutput(bool speaker);
+	Q_INVOKABLE bool isRecording() const;
+	Q_INVOKABLE QString startRecording();
+	Q_INVOKABLE void stopRecording();
 
 	bool isHeadsetAntenna() const;
 	void setHeadsetAntenna(bool headset);
@@ -81,6 +86,7 @@ signals:
 	void regionChanged();
 	void rdsEnabledChanged();
 	void rdsChanged();
+	void recordingChanged();
 
 private:
 	bool powerUp(int freq);
@@ -98,6 +104,7 @@ private:
 	void restoreAudio();
 
 	QSettings settings;
+	QProcess recorder;
 	QTimer rdsTimer;
 	QString paSource;
 	QString paSink;

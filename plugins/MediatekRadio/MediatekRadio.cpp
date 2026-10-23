@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include <QDateTime>
 #include <QDebug>
+#include <QDir>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStandardPaths>
@@ -109,6 +111,8 @@ MediatekRadio::MediatekRadio(QObject *parent)
 	  rdsEnabled(settings.value("rds", true).toBool()),
 	  frequency(settings.value("frequency", kDefaultFrequency).toInt())
 {
+	connect(&recorder, &QProcess::stateChanged, this, &MediatekRadio::recordingChanged);
+
 	rdsTimer.setInterval(kRdsInterval);
 	connect(&rdsTimer, &QTimer::timeout, this, &MediatekRadio::readRds);
 }
@@ -209,6 +213,7 @@ QByteArray MediatekRadio::stopRadio()
 	if (!running)
 		return "Start radio";
 
+	stopRecording();
 	rdsTimer.stop();
 	clearRds();
 	restoreAudio();
@@ -507,4 +512,44 @@ QString MediatekRadio::getDevicePath() const
 QString MediatekRadio::getChipName() const
 {
 	return chipName;
+}
+
+bool MediatekRadio::isRecording() const
+{
+	return recorder.state() != QProcess::NotRunning;
+}
+
+// Recordings go to the app data dir
+QString MediatekRadio::startRecording()
+{
+	if (!running || isRecording())
+		return QString();
+
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/recordings";
+	QDir().mkpath(dir);
+
+	const QString file = QString("%1/%2_%3MHz.wav")
+		.arg(dir)
+		.arg(QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss"))
+		.arg(frequency / 100.0, 0, 'f', 1);
+
+	recorder.start("/usr/bin/parecord", {"--device=" + paSource, "--file-format=wav",
+					    "--format=s16le", "--rate=48000", "--channels=2", file});
+	if (!recorder.waitForStarted()) {
+		qWarning() << "Failed to start parecord:" << recorder.errorString();
+		return QString();
+	}
+
+	return file;
+}
+
+// parecord finalizes the WAV header on SIGTERM
+void MediatekRadio::stopRecording()
+{
+	if (!isRecording())
+		return;
+
+	recorder.terminate();
+	if (!recorder.waitForFinished(3000))
+		recorder.kill();
 }
