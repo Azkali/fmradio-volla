@@ -37,6 +37,8 @@ public:
 	Q_INVOKABLE int getFrequency() const;
 	Q_INVOKABLE int seekUp();
 	Q_INVOKABLE int seekDown();
+	Q_INVOKABLE int stepUp();
+	Q_INVOKABLE int stepDown();
 	Q_INVOKABLE bool isRadioRunning() const;
 	Q_INVOKABLE bool isSpeakerOutput() const;
 	Q_INVOKABLE void setSpeakerOutput(bool speaker);
@@ -48,6 +50,7 @@ signals:
 
 private:
 	int seek(bool up);
+	int step(bool up);
 	void setFrequency(int freq);
 	void setMute(bool mute);
 	int getRssi();

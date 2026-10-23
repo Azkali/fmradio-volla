@@ -83,6 +83,17 @@ static QString activePort(const QString &kind, const QString &node)
 	return QString();
 }
 
+// Wrap around at the band edges
+static int wrapFrequency(int freq)
+{
+	if (freq > kBandMax)
+		return kBandMin;
+	if (freq < kBandMin)
+		return kBandMax;
+
+	return freq;
+}
+
 MediatekRadio::MediatekRadio(QObject *parent)
 	: QObject(parent),
 	  settings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/radio.conf",
@@ -224,6 +235,24 @@ int MediatekRadio::seekUp()
 int MediatekRadio::seekDown()
 {
 	return seek(false);
+}
+
+int MediatekRadio::stepUp()
+{
+	return step(true);
+}
+
+int MediatekRadio::stepDown()
+{
+	return step(false);
+}
+
+// Move by 0.1 MHz
+int MediatekRadio::step(bool up)
+{
+	tune(wrapFrequency(frequency + (up ? kStep : -kStep)));
+
+	return frequency;
 }
 
 int MediatekRadio::seek(bool up)
