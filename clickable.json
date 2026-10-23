@@ -1,6 +1,7 @@
 {
-  "kill": "fmradio",
-  "clickable_minimum_required": "8",
+  "clickable_minimum_required": "8.10.0",
   "builder": "cmake",
-  "framework": "ubuntu-touch-24.04-1.x"
+  "framework": "ubuntu-touch-24.04-2.x",
+  "skip_review": true,
+  "always_clean": true
 }

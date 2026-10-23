@@ -11,5 +11,5 @@
     },
     "version": "1.0.0",
     "maintainer": "Azkali Manad <a.ffcc7@gmail.com>",
-    "framework": "ubuntu-touch-24.04-1.x"
+    "framework": "$ENV{CLICK_FRAMEWORK}"
 }
