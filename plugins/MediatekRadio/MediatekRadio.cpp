@@ -123,33 +123,14 @@ bool MediatekRadio::isHeadsetAvailable() {
 void MediatekRadio::preparePulseAudio() {
 
 	sh("pacmd set-source-port " + paSource() + " input-fm_tuner");
-	sh("pactl load-module module-loopback source=" + paSource() + " sink=" + paSink());
+	sh("pactl load-module module-loopback source=" + paSource() + " sink=" + paSink() +
+	   " sink_input_properties=media.role=multimedia");
 
 }
 
 bool MediatekRadio::isRadioRunning() {
 
 	return radioRunning;
-
-}
-
-// Volume is always at 100% without this
-void MediatekRadio::startVolumeUpdater() {
-
-	sh("touch ~/.radioRunning");
-	sh("while ( test -f ~/.radioRunning ) do "
-	   "pactl set-source-volume " + paSource() + " "
-	   "$(printf \"%.*f\\n\" 0 $(echo print $(dbus-send --session --type=method_call --print-reply "
-	   "--dest=org.ayatana.indicator.sound /org/ayatana/indicator/sound org.gtk.Actions.DescribeAll "
-	   "| grep -A5 \"string \\\"volume\\\"\" | grep double | cut -b 49-52)*65536 | perl)); "
-	   "sleep 0.5; done &");
-
-}
-
-void MediatekRadio::stopVolumeUpdater() {
-
-	sh("rm -f ~/.radioRunning");
-	sh("pactl set-source-volume " + paSource() + " 65536"); // 100%
 
 }
 
@@ -173,7 +154,6 @@ QByteArray MediatekRadio::startRadio(int freq) {
 		preparePulseAudio();
 
 		radioRunning = true;
-		startVolumeUpdater();
 
 		return "Stop radio";
 	} else {
@@ -204,8 +184,6 @@ QByteArray MediatekRadio::stopRadio() {
 	} else {
 		ret = sh("pacmd set-source-port " + paSource() + " input-builtin_mic && pacmd set-sink-port " + paSink() + " output-wired_headphone");
 	}
-
-	stopVolumeUpdater();
 
 	radioRunning = false;
 

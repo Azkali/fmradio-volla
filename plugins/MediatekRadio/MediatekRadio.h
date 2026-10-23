@@ -32,8 +32,6 @@ private:
 	void unmute();
 	bool isHeadsetAvailable();
 	int getRssi();
-	void startVolumeUpdater();
-	void stopVolumeUpdater();
 
 public:
 	MediatekRadio();
