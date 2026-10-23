@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: fmradio.azkali\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 15:38+0000\n"
+"POT-Creation-Date: 2026-10-29 12:28+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,18 +17,86 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: ../qml/Main.qml:39 fmradio.desktop.in.h:1
+#: ../qml/pages/HomePage.qml:392 fmradio.desktop.in.h:1
 msgid "FM Radio"
 msgstr ""
 
-#: ../qml/Main.qml:66
-msgid "<"
+#: ../qml/pages/SettingsPage.qml:40
+msgid "General"
 msgstr ""
 
-#: ../qml/Main.qml:80
-msgid ">"
+#: ../qml/pages/SettingsPage.qml:44
+msgid "Use headphone wire as antenna"
 msgstr ""
 
-#: ../qml/Main.qml:94
-msgid "Start radio"
+#: ../qml/pages/SettingsPage.qml:57
+msgid "Audio Output"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:61
+msgid "Mono audio for weak signals"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:62
+msgid "Reduces high-frequency multiplex static"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:75
+msgid "Tuning & Band"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:79
+msgid "Decode RDS radiotext"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:80
+msgid "Live station metadata & program info"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:92
+msgid "Region"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:109
+msgid "Select your region:"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:133
+msgid "Save"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:143
+msgid "Cancel"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:161
+msgid "Recordings"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:165
+msgid "Capture Quality"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:166
+msgid "WAV Lossless (48 kHz, 16-bit)"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:171
+msgid "Storage Location"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:185
+msgid "Device Info"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:189
+msgid "Hardware Node"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:195
+msgid "Tuner Driver"
+msgstr ""
+
+#: ../qml/pages/SettingsPage.qml:208
+msgid "Radio Settings"
 msgstr ""
