@@ -34,6 +34,7 @@
 static const int kBandMin = 8750;
 static const int kBandMax = 10800;
 static const int kStep = 10;
+static const int kRdsInterval = 100;
 static const int kDefaultFrequency = 10250;
 
 // Run pactl with a C locale so its output can be parsed
@@ -105,8 +106,11 @@ MediatekRadio::MediatekRadio(QObject *parent)
 	  headsetAntenna(settings.value("headsetAntenna", true).toBool()),
 	  mono(settings.value("mono", false).toBool()),
 	  region(static_cast<Region>(settings.value("region", RegionWorld).toInt())),
+	  rdsEnabled(settings.value("rds", true).toBool()),
 	  frequency(settings.value("frequency", kDefaultFrequency).toInt())
 {
+	rdsTimer.setInterval(kRdsInterval);
+	connect(&rdsTimer, &QTimer::timeout, this, &MediatekRadio::readRds);
 }
 
 MediatekRadio::~MediatekRadio()
@@ -166,6 +170,7 @@ bool MediatekRadio::powerUp(int freq)
 
 	applyAntenna();
 	applyMono();
+	applyRds();
 
 	return true;
 }
@@ -204,6 +209,8 @@ QByteArray MediatekRadio::stopRadio()
 	if (!running)
 		return "Start radio";
 
+	rdsTimer.stop();
+	clearRds();
 	restoreAudio();
 
 	int ret = COM_pwr_down(fd, 0);
@@ -246,6 +253,7 @@ void MediatekRadio::setFrequency(int freq)
 
 	frequency = freq;
 	settings.setValue("frequency", freq);
+	clearRds();
 	emit frequencyChanged();
 }
 
@@ -407,6 +415,88 @@ void MediatekRadio::setRegion(Region newRegion)
 	}
 
 	emit regionChanged();
+}
+
+bool MediatekRadio::isRdsEnabled() const
+{
+	return rdsEnabled;
+}
+
+void MediatekRadio::setRdsEnabled(bool enabled)
+{
+	if (rdsEnabled == enabled)
+		return;
+
+	rdsEnabled = enabled;
+	settings.setValue("rds", enabled);
+	if (running)
+		applyRds();
+
+	emit rdsEnabledChanged();
+}
+
+void MediatekRadio::applyRds()
+{
+	int ret = COM_turn_on_off_rds(fd, rdsEnabled ? FMR_RDS_ON : FMR_RDS_OFF);
+	if (ret < 0)
+		qWarning() << "Failed to switch rds:" << ret;
+
+	if (rdsEnabled) {
+		rdsTimer.start();
+	} else {
+		rdsTimer.stop();
+		clearRds();
+	}
+}
+
+// read() never blocks and clears the driver side data, so poll it like MTK does
+void MediatekRadio::readRds()
+{
+	RDSData_Struct rds;
+	uint16_t status = 0;
+
+	if (COM_read_rds_data(fd, &rds, &status) < 0)
+		return;
+
+	bool changed = false;
+
+	if (status & RDS_EVENT_PROGRAMNAME) {
+		uint8_t *ps = rds.PS_Data.PS[3];
+		COM_change_string(ps, 8);
+		stationName = QString::fromLatin1(reinterpret_cast<const char *>(ps), 8).trimmed();
+		changed = true;
+	}
+
+	if (status & RDS_EVENT_LAST_RADIOTEXT) {
+		uint8_t *rt = rds.RT_Data.TextData[3];
+		const int length = qMin<int>(rds.RT_Data.TextLength, 64);
+		COM_change_string(rt, length);
+		radioText = QString::fromLatin1(reinterpret_cast<const char *>(rt), length).trimmed();
+		changed = true;
+	}
+
+	if (changed)
+		emit rdsChanged();
+}
+
+void MediatekRadio::clearRds()
+{
+	if (stationName.isEmpty() && radioText.isEmpty())
+		return;
+
+	stationName.clear();
+	radioText.clear();
+	emit rdsChanged();
+}
+
+QString MediatekRadio::getStationName() const
+{
+	return stationName;
+}
+
+QString MediatekRadio::getRadioText() const
+{
+	return radioText;
 }
 
 QString MediatekRadio::getDevicePath() const

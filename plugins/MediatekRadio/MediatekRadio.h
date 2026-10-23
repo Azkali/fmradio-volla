@@ -20,6 +20,7 @@
 #include <QObject>
 #include <QSettings>
 #include <QString>
+#include <QTimer>
 
 class MediatekRadio : public QObject {
 	Q_OBJECT
@@ -29,6 +30,9 @@ class MediatekRadio : public QObject {
 	Q_PROPERTY(bool headsetAntenna READ isHeadsetAntenna WRITE setHeadsetAntenna NOTIFY headsetAntennaChanged)
 	Q_PROPERTY(bool mono READ isMono WRITE setMono NOTIFY monoChanged)
 	Q_PROPERTY(Region region READ getRegion WRITE setRegion NOTIFY regionChanged)
+	Q_PROPERTY(bool rdsEnabled READ isRdsEnabled WRITE setRdsEnabled NOTIFY rdsEnabledChanged)
+	Q_PROPERTY(QString stationName READ getStationName NOTIFY rdsChanged)
+	Q_PROPERTY(QString radioText READ getRadioText NOTIFY rdsChanged)
 	Q_PROPERTY(QString devicePath READ getDevicePath CONSTANT)
 	Q_PROPERTY(QString chipName READ getChipName NOTIFY runningChanged)
 
@@ -61,6 +65,10 @@ public:
 	void setMono(bool enabled);
 	Region getRegion() const;
 	void setRegion(Region newRegion);
+	bool isRdsEnabled() const;
+	void setRdsEnabled(bool enabled);
+	QString getStationName() const;
+	QString getRadioText() const;
 	QString getDevicePath() const;
 	QString getChipName() const;
 
@@ -71,6 +79,8 @@ signals:
 	void headsetAntennaChanged();
 	void monoChanged();
 	void regionChanged();
+	void rdsEnabledChanged();
+	void rdsChanged();
 
 private:
 	bool powerUp(int freq);
@@ -80,22 +90,29 @@ private:
 	void setMute(bool mute);
 	void applyAntenna();
 	void applyMono();
+	void applyRds();
+	void readRds();
+	void clearRds();
 	bool isHeadsetConnected();
 	void routeAudio();
 	void restoreAudio();
 
 	QSettings settings;
+	QTimer rdsTimer;
 	QString paSource;
 	QString paSink;
 	QString savedSourcePort;
 	QString savedSinkPort;
 	QString loopbackModule;
+	QString stationName;
+	QString radioText;
 	QString chipName;
 	bool running = false;
 	bool speakerOutput = false;
 	bool headsetAntenna;
 	bool mono;
 	Region region;
+	bool rdsEnabled;
 	int frequency;
 	int fd = -1;
 };
