@@ -22,11 +22,13 @@
 #include <QSettings>
 #include <QString>
 #include <QTimer>
+#include <QVariantList>
 
 class MediatekRadio : public QObject {
 	Q_OBJECT
 	Q_PROPERTY(bool running READ isRadioRunning NOTIFY runningChanged)
 	Q_PROPERTY(int frequency READ getFrequency NOTIFY frequencyChanged)
+	Q_PROPERTY(QVariantList presets READ getPresets NOTIFY presetsChanged)
 	Q_PROPERTY(bool speakerOutput READ isSpeakerOutput WRITE setSpeakerOutput NOTIFY speakerOutputChanged)
 	Q_PROPERTY(bool headsetAntenna READ isHeadsetAntenna WRITE setHeadsetAntenna NOTIFY headsetAntennaChanged)
 	Q_PROPERTY(bool mono READ isMono WRITE setMono NOTIFY monoChanged)
@@ -58,12 +60,16 @@ public:
 	Q_INVOKABLE int stepUp();
 	Q_INVOKABLE int stepDown();
 	Q_INVOKABLE bool isRadioRunning() const;
+	Q_INVOKABLE void savePreset(int slot);
+	Q_INVOKABLE void clearPreset(int slot);
+	Q_INVOKABLE void tunePreset(int slot);
 	Q_INVOKABLE bool isSpeakerOutput() const;
 	Q_INVOKABLE void setSpeakerOutput(bool speaker);
 	Q_INVOKABLE bool isRecording() const;
 	Q_INVOKABLE QString startRecording();
 	Q_INVOKABLE void stopRecording();
 
+	QVariantList getPresets() const;
 	bool isHeadsetAntenna() const;
 	void setHeadsetAntenna(bool headset);
 	bool isMono() const;
@@ -80,6 +86,7 @@ public:
 signals:
 	void runningChanged();
 	void frequencyChanged();
+	void presetsChanged();
 	void speakerOutputChanged();
 	void headsetAntennaChanged();
 	void monoChanged();
@@ -93,6 +100,7 @@ private:
 	int seek(bool up);
 	int step(bool up);
 	void setFrequency(int freq);
+	void setPreset(int slot, int freq);
 	void setMute(bool mute);
 	void applyAntenna();
 	void applyMono();
@@ -114,6 +122,7 @@ private:
 	QString stationName;
 	QString radioText;
 	QString chipName;
+	QVariantList presets;
 	bool running = false;
 	bool speakerOutput = false;
 	bool headsetAntenna;

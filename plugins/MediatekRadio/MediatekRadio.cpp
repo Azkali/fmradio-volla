@@ -38,6 +38,7 @@ static const int kBandMax = 10800;
 static const int kStep = 10;
 static const int kRdsInterval = 100;
 static const int kDefaultFrequency = 10250;
+static const int kPresetCount = 3;
 
 // Run pactl with a C locale so its output can be parsed
 static QString pactl(const QStringList &args)
@@ -111,6 +112,11 @@ MediatekRadio::MediatekRadio(QObject *parent)
 	  rdsEnabled(settings.value("rds", true).toBool()),
 	  frequency(settings.value("frequency", kDefaultFrequency).toInt())
 {
+	// An empty slot is stored as 0
+	presets = settings.value("presets").toList();
+	while (presets.size() < kPresetCount)
+		presets << 0;
+
 	connect(&recorder, &QProcess::stateChanged, this, &MediatekRadio::recordingChanged);
 
 	rdsTimer.setInterval(kRdsInterval);
@@ -330,6 +336,39 @@ void MediatekRadio::setMute(bool mute)
 	int ret = COM_set_mute(fd, mute);
 	if (ret < 0)
 		qWarning() << "Failed to set mute:" << ret;
+}
+
+QVariantList MediatekRadio::getPresets() const
+{
+	return presets;
+}
+
+void MediatekRadio::savePreset(int slot)
+{
+	setPreset(slot, frequency);
+}
+
+void MediatekRadio::clearPreset(int slot)
+{
+	setPreset(slot, 0);
+}
+
+void MediatekRadio::setPreset(int slot, int freq)
+{
+	if (slot < 0 || slot >= kPresetCount)
+		return;
+
+	presets[slot] = freq;
+	settings.setValue("presets", presets);
+	emit presetsChanged();
+}
+
+void MediatekRadio::tunePreset(int slot)
+{
+	if (slot < 0 || slot >= kPresetCount || presets[slot].toInt() == 0)
+		return;
+
+	tune(presets[slot].toInt());
 }
 
 bool MediatekRadio::isSpeakerOutput() const
