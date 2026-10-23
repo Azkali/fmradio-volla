@@ -30,7 +30,7 @@
 
 
 #include "MediatekRadio.h"
-#include "common.cpp"
+#include "common.h"
 
 #define FM_DEV_NAME "/dev/fm"
 

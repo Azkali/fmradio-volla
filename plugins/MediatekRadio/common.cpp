@@ -22,7 +22,7 @@
 #define LOG_TAG "FMLIB_COM"
 #define UNUSED(x) (void)(x)
 
-#include "fm.h"
+#include "common.h"
 
 
 #define FMR_ASSERT(a) { \

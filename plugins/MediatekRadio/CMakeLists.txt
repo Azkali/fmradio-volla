@@ -1,17 +1,20 @@
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(PLUGIN "MediatekRadio")
 
 set(
     SRC
     plugin.cpp
     MediatekRadio.cpp
+    common.cpp
 )
 
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_CXX_STANDARD 11)
+
+find_package(Qt5 COMPONENTS Qml Quick REQUIRED)
 
 add_library(${PLUGIN} MODULE ${SRC})
 set_target_properties(${PLUGIN} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PLUGIN})
-qt5_use_modules(${PLUGIN} Qml Quick DBus)
+target_link_libraries(${PLUGIN} Qt5::Qml Qt5::Quick)
 
 execute_process(
     COMMAND dpkg-architecture -qDEB_HOST_MULTIARCH
