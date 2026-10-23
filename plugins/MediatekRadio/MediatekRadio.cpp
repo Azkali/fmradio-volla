@@ -14,299 +14,238 @@
  * limitations under the License.
  */
 
-
-#include <stdio.h>
-
-#include <sys/ioctl.h>
-#include <linux/ioctl.h>
-#include <string.h>
-#include <iostream>
-#include <thread>
-#include <cstdio>
-#include <cstring>
-#include <string>
-#include <vector>
-#include <initializer_list>
-
+#include <QDebug>
+#include <QProcess>
+#include <QProcessEnvironment>
 
 #include "MediatekRadio.h"
 #include "common.h"
 
 #define FM_DEV_NAME "/dev/fm"
 
-#define FM_BAND_UE      1 // US/Europe band  87.5MHz ~ 108MHz (DEFAULT)
-#define FM_BAND_JAPAN   2 // Japan band      76MHz   ~ 90MHz
-#define FM_BAND_JAPANW  3 // Japan wideband  76MHZ   ~ 108MHz
-#define FM_BAND_SPECIAL 4 // special   band  between 76MHZ   and  108MHz
+// The driver ignores the band, its range is fixed to 87.5 - 108 MHz
+#define FM_BAND_UE      1
 
-// ---------------------------------------------------------------------------
-// PulseAudio helpers
-//
+// Frequencies are in 10 kHz units
+static const int kBandMin = 8750;
+static const int kBandMax = 10800;
+static const int kStep = 10;
+static const int kSeekRssi = -75;
+
+// Run pactl with a C locale so its output can be parsed
+static QString pactl(const QStringList &args)
+{
+	QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+	env.insert("LC_ALL", "C");
+
+	QProcess process;
+	process.setProcessEnvironment(env);
+	process.start("/usr/bin/pactl", args);
+	process.waitForFinished();
+
+	return QString::fromUtf8(process.readAllStandardOutput()).trimmed();
+}
+
 // Node names differ between pulseaudio-modules-droid releases:
-//   legacy (Halium 9/10):  source.droid          / sink.droid
-//   newer  (Halium 11+):   source.primary_input  / sink.primary_output
-// so probe them once instead of hardcoding.
-// ---------------------------------------------------------------------------
-
-// Run a shell command and return its stdout, one line per element.
-static std::vector<std::string> runLines(const std::string &cmd)
+//   Halium 9/10: source.droid / sink.droid
+//   Halium 11+:  source.primary_input / sink.primary_output
+static QString findNode(const QString &kind, const QStringList &candidates)
 {
-	std::vector<std::string> lines;
-	FILE *fp = popen(cmd.c_str(), "r");
-	if (!fp)
-		return lines;
+	QStringList names;
+	for (const QString &line : pactl({"list", "short", kind}).split('\n'))
+		names << line.section('\t', 1, 1);
 
-	char buf[256];
-	while (fgets(buf, sizeof buf, fp)) {
-		buf[strcspn(buf, "\n")] = '\0';
-		lines.emplace_back(buf);
+	for (const QString &candidate : candidates)
+		if (names.contains(candidate))
+			return candidate;
+
+	return candidates.first();
+}
+
+// Node blocks start with an unindented "Sink #N" or "Source #N" line
+static QString activePort(const QString &kind, const QString &node)
+{
+	bool inNode = false;
+
+	for (const QString &line : pactl({"list", kind}).split('\n')) {
+		const QString field = line.trimmed();
+
+		if (!line.startsWith('\t'))
+			inNode = false;
+		else if (field == "Name: " + node)
+			inNode = true;
+		else if (inNode && field.startsWith("Active Port: "))
+			return field.section(' ', 2);
 	}
-	pclose(fp);
-	return lines;
+
+	return QString();
 }
 
-// Pick the first existing PulseAudio node name from a candidate list.
-// kind is "sources" or "sinks".
-static std::string findNode(const char *kind, std::initializer_list<const char *> candidates)
+MediatekRadio::MediatekRadio(QObject *parent)
+	: QObject(parent),
+	  paSource(findNode("sources", {"source.primary_input", "source.droid"})),
+	  paSink(findNode("sinks", {"sink.primary_output", "sink.droid"}))
 {
-	const auto names = runLines(std::string("/usr/bin/pactl list short ") + kind + " | /usr/bin/awk '{ print $2 }'");
-	for (const char *c : candidates)
-		for (const auto &n : names)
-			if (n == c)
-				return n;
-	// nothing matched; fall back to the first candidate so the error is visible in logs
-	return *candidates.begin();
 }
 
-static const std::string &paSource()
+MediatekRadio::~MediatekRadio()
 {
-	static const std::string s = findNode("sources", {"source.primary_input", "source.droid"});
-	return s;
+	stopRadio();
 }
 
-static const std::string &paSink()
+// Wired headsets and headphones act as the antenna
+bool MediatekRadio::isHeadsetConnected()
 {
-	static const std::string s = findNode("sinks", {"sink.primary_output", "sink.droid"});
-	return s;
+	const QString port = activePort("sinks", paSink);
+
+	return port == "output-wired_headset" || port == "output-wired_headphone";
 }
 
-static int sh(const std::string &cmd)
+void MediatekRadio::routeAudio()
 {
-	return system(cmd.c_str());
+	savedSourcePort = activePort("sources", paSource);
+	savedSinkPort = activePort("sinks", paSink);
+
+	pactl({"set-source-port", paSource, "input-fm_tuner"});
+
+	// The multimedia role makes the loopback follow the system media volume
+	loopbackModule = pactl({"load-module", "module-loopback",
+				"source=" + paSource, "sink=" + paSink,
+				"sink_input_properties=media.role=multimedia"});
 }
 
-MediatekRadio::MediatekRadio() {
+void MediatekRadio::restoreAudio()
+{
+	if (!loopbackModule.isEmpty())
+		pactl({"unload-module", loopbackModule});
+	loopbackModule.clear();
 
+	if (savedSourcePort.isEmpty() || savedSourcePort == "input-fm_tuner")
+		savedSourcePort = savedSinkPort == "output-wired_headset" ? "input-wired_headset" : "input-builtin_mic";
+
+	pactl({"set-source-port", paSource, savedSourcePort});
+	if (!savedSinkPort.isEmpty())
+		pactl({"set-sink-port", paSink, savedSinkPort});
 }
 
-// check if headset/headphones are connected, they act as antenna
-bool MediatekRadio::isHeadsetAvailable() {
-
-	isHeadset = false;
-
-	const auto ports = runLines(
-		"/usr/bin/pactl list sinks | "
-		"/usr/bin/awk '/^Sink #/ { droid = 0 } /Name: " + paSink() + "$/ { droid = 1 } droid && /Active Port:/ { print $3 }'");
-
-	for (const auto &port : ports) {
-		if (port == "output-wired_headset") {
-			isHeadset = true;   // headset with mic: restore input-wired_headset on stop
-			return true;
-		}
-		if (port == "output-wired_headphone")
-			return true;
-	}
-	return false;
-}
-
-// This is needed to route the FM input to the headphones
-void MediatekRadio::preparePulseAudio() {
-
-	sh("pacmd set-source-port " + paSource() + " input-fm_tuner");
-	sh("pactl load-module module-loopback source=" + paSource() + " sink=" + paSink() +
-	   " sink_input_properties=media.role=multimedia");
-
-}
-
-bool MediatekRadio::isRadioRunning() {
-
-	return radioRunning;
-
-}
-
-// Start the radio
-QByteArray MediatekRadio::startRadio(int freq) {
-
-	if(isHeadsetAvailable()) {
-
-		int ret = 0;
-
-		if((ret = COM_open_dev(FM_DEV_NAME, &idx)) < 0) {
-			printf("error opening device: %d\n", ret);
-			return "Error";
-		}
-
-		if((ret = COM_pwr_up(idx, FM_BAND_UE, freq)) < 0) {
-			printf("error powering up: %d\n", ret);
-			return "Error";
-		}
-
-		preparePulseAudio();
-
-		radioRunning = true;
-
+QByteArray MediatekRadio::startRadio(int freq)
+{
+	if (running)
 		return "Stop radio";
-	} else {
+
+	if (!isHeadsetConnected())
 		return "Headset not available";
-	}
 
-}
-
-// Stop the radio
-QByteArray MediatekRadio::stopRadio() {
-
-	int ret = 0;
-
-	if((ret = COM_pwr_down(idx, 0)) < 0) {
-		printf("error powering down: %d\n", ret);
+	int ret = COM_open_dev(FM_DEV_NAME, &fd);
+	if (ret < 0) {
+		qWarning() << "Failed to open" << FM_DEV_NAME << ret;
 		return "Error";
 	}
 
-	if((ret = COM_close_dev(idx)) < 0) {
-		printf("error closing device; %d\n", ret);
+	ret = COM_pwr_up(fd, FM_BAND_UE, freq);
+	if (ret < 0) {
+		qWarning() << "Failed to power up:" << ret;
+		COM_close_dev(fd);
+		fd = -1;
 		return "Error";
-	}
-
-	ret = system("pactl unload-module module-loopback");
-
-	if(isHeadset) {
-		ret = sh("pacmd set-source-port " + paSource() + " input-wired_headset && pacmd set-sink-port " + paSink() + " output-wired_headset");
-	} else {
-		ret = sh("pacmd set-source-port " + paSource() + " input-builtin_mic && pacmd set-sink-port " + paSink() + " output-wired_headphone");
-	}
-
-	radioRunning = false;
-
-	return "Start radio";
-
-}
-
-// Tune to different frequency
-void MediatekRadio::tune(int freq) {
-
-	if(isRadioRunning()) {
-		int ret;
-
-		if((ret = COM_tune(idx, freq, FM_BAND_UE)) < 0) {
-			printf("error tuning: %d\n", ret);
-		}
-	} else {
-		printf("tune: radio not running\n");
 	}
 
 	frequency = freq;
+	routeAudio();
 
+	running = true;
+
+	return "Stop radio";
 }
 
-void MediatekRadio::mute() {
+QByteArray MediatekRadio::stopRadio()
+{
+	if (!running)
+		return "Start radio";
 
-	int ret;
+	restoreAudio();
 
-	if((ret = COM_set_mute(idx, 1)) < 0) {
-		printf("error muting: %d\n", ret);
+	int ret = COM_pwr_down(fd, 0);
+	if (ret < 0)
+		qWarning() << "Failed to power down:" << ret;
+
+	COM_close_dev(fd);
+	fd = -1;
+
+	running = false;
+
+	return "Start radio";
+}
+
+bool MediatekRadio::isRadioRunning() const
+{
+	return running;
+}
+
+void MediatekRadio::tune(int freq)
+{
+	if (running && COM_tune(fd, freq, FM_BAND_UE) < 0) {
+		qWarning() << "Failed to tune to" << freq;
+		return;
 	}
 
+	frequency = freq;
 }
 
-void MediatekRadio::unmute() {
+int MediatekRadio::getFrequency() const
+{
+	return frequency;
+}
 
-	int ret;
+int MediatekRadio::seekUp()
+{
+	return seek(true);
+}
 
-	if((ret = COM_set_mute(idx, 0)) < 0) {
-		printf("error unmuting: %d\n", ret);
+int MediatekRadio::seekDown()
+{
+	return seek(false);
+}
+
+int MediatekRadio::seek(bool up)
+{
+	if (!running)
+		return frequency;
+
+	setMute(true);
+
+	const int delta = up ? kStep : -kStep;
+	int found = frequency;
+
+	for (int freq = frequency + delta; freq >= kBandMin && freq <= kBandMax; freq += delta) {
+		if (COM_tune(fd, freq, FM_BAND_UE) == 0 && getRssi() > kSeekRssi) {
+			found = freq;
+			break;
+		}
 	}
 
+	tune(found);
+	setMute(false);
 
+	return frequency;
 }
 
-int MediatekRadio::getRssi() {
+void MediatekRadio::setMute(bool mute)
+{
+	int ret = COM_set_mute(fd, mute);
+	if (ret < 0)
+		qWarning() << "Failed to set mute:" << ret;
+}
 
-	int ret;
+int MediatekRadio::getRssi()
+{
 	int rssi;
 
-	if((ret = COM_get_rssi(idx, &rssi)) < 0) {
-		printf("error getting rssi: %d\n", ret);
+	int ret = COM_get_rssi(fd, &rssi);
+	if (ret < 0) {
+		qWarning() << "Failed to get rssi:" << ret;
 		return -100;
 	}
 
 	return rssi;
-
-}
-
-int MediatekRadio::seekUp() {
-
-	if(radioRunning) {
-
-		mute();
-
-		bool foundStation = false;
-		int tmp = frequency;
-
-		for(int i = frequency + 10; i < 10800; i += 10) {
-			tune(i);
-			if(getRssi() > -75) {
-				foundStation = true;
-				break;
-			}
-		}
-
-		if(!foundStation) {
-			tune(tmp);
-		}
-		unmute();
-
-	}
-
-	return frequency;
-
-}
-
-int MediatekRadio::seekDown() {
-
-	if(radioRunning) {
-
-		mute();
-
-		bool foundStation = false;
-		int tmp = frequency;
-
-		for(int i = frequency - 10; i > 8750; i -= 10) {
-			tune(i);
-			if(getRssi() > -75) {
-				foundStation = true;
-				break;
-			}
-		}
-
-		if(!foundStation) {
-			tune(tmp);
-		}
-		unmute();
-
-	}
-
-	return frequency;
-
-}
-
-int MediatekRadio::getFrequency() {
-
-	return frequency;
-
-}
-
-MediatekRadio::~MediatekRadio() {
-
-	stopRadio();
-
 }

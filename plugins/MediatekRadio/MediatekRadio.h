@@ -18,33 +18,39 @@
 #define MEDIATEKRADIO_H
 
 #include <QObject>
+#include <QString>
 
 class MediatekRadio : public QObject {
 	Q_OBJECT
 
-private:
-	bool radioRunning = false;
-	bool isHeadset = false;
-	int frequency = 10250;
-	int idx = -1;
-	void preparePulseAudio();
-	void mute();
-	void unmute();
-	bool isHeadsetAvailable();
-	int getRssi();
-
 public:
-	MediatekRadio();
-	~MediatekRadio() /* = default*/ ;
+	explicit MediatekRadio(QObject *parent = nullptr);
+	~MediatekRadio();
 
-	Q_INVOKABLE QByteArray startRadio(int);
+	Q_INVOKABLE QByteArray startRadio(int freq);
 	Q_INVOKABLE QByteArray stopRadio();
-	Q_INVOKABLE void tune(int);
-	Q_INVOKABLE int getFrequency();
+	Q_INVOKABLE void tune(int freq);
+	Q_INVOKABLE int getFrequency() const;
 	Q_INVOKABLE int seekUp();
 	Q_INVOKABLE int seekDown();
-	Q_INVOKABLE bool isRadioRunning();
+	Q_INVOKABLE bool isRadioRunning() const;
 
+private:
+	int seek(bool up);
+	void setMute(bool mute);
+	int getRssi();
+	bool isHeadsetConnected();
+	void routeAudio();
+	void restoreAudio();
+
+	QString paSource;
+	QString paSink;
+	QString savedSourcePort;
+	QString savedSinkPort;
+	QString loopbackModule;
+	bool running = false;
+	int frequency = 10250;
+	int fd = -1;
 };
 
 #endif
