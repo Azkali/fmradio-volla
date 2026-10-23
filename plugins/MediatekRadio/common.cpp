@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2014 The Android Open Source Project
- * Modifications copyright (C) 2020 venji10 <bennisteinir@gmail.com>
+ * Modifications copyright (C) 2026 Azkali Manad <a.ffcc7@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

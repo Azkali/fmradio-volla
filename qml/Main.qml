@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 venji10 <bennisteinir@gmail.com>
+ * Copyright (C) 2026 Azkali Manad <a.ffcc7@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import MediatekRadio 1.0
 MainView {
 	id: root
 	objectName: 'mainView'
-	applicationName: 'fmradio.venji10'
+	applicationName: 'fmradio.azkali'
 	automaticOrientation: false
 
 	width: units.gu(45)

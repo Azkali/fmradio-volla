@@ -7,9 +7,7 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication *app = new QGuiApplication(argc, (char**)argv);
-    app->setApplicationName("fmradio.venji10");
-
-    qDebug() << "Starting app from main.cpp";
+    app->setApplicationName("fmradio.azkali");
 
     QQuickView *view = new QQuickView();
     view->setSource(QUrl("qrc:/Main.qml"));

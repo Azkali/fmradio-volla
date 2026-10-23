@@ -1,5 +1,5 @@
 {
-    "name": "fmradio.venji10",
+    "name": "fmradio.azkali",
     "description": "FM Radio app for UT",
     "architecture": "arm64",
     "title": "FM Radio",
@@ -10,6 +10,6 @@
         }
     },
     "version": "1.0.0",
-    "maintainer": "venji10 <bennisteinir@gmail.com>",
+    "maintainer": "Azkali Manad <a.ffcc7@gmail.com>",
     "framework": "ubuntu-touch-24.04-1.x"
 }
