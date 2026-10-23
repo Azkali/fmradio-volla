@@ -17,6 +17,7 @@
 #include <QDebug>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QStandardPaths>
 
 #include "MediatekRadio.h"
 #include "common.h"
@@ -31,6 +32,7 @@ static const int kBandMin = 8750;
 static const int kBandMax = 10800;
 static const int kStep = 10;
 static const int kSeekRssi = -75;
+static const int kDefaultFrequency = 10250;
 
 // Run pactl with a C locale so its output can be parsed
 static QString pactl(const QStringList &args)
@@ -83,8 +85,11 @@ static QString activePort(const QString &kind, const QString &node)
 
 MediatekRadio::MediatekRadio(QObject *parent)
 	: QObject(parent),
+	  settings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/radio.conf",
+		   QSettings::IniFormat),
 	  paSource(findNode("sources", {"source.primary_input", "source.droid"})),
-	  paSink(findNode("sinks", {"sink.primary_output", "sink.droid"}))
+	  paSink(findNode("sinks", {"sink.primary_output", "sink.droid"})),
+	  frequency(settings.value("frequency", kDefaultFrequency).toInt())
 {
 }
 
@@ -150,10 +155,11 @@ QByteArray MediatekRadio::startRadio(int freq)
 		return "Error";
 	}
 
-	frequency = freq;
+	setFrequency(freq);
 	routeAudio();
 
 	running = true;
+	emit runningChanged();
 
 	return "Stop radio";
 }
@@ -173,6 +179,7 @@ QByteArray MediatekRadio::stopRadio()
 	fd = -1;
 
 	running = false;
+	emit runningChanged();
 
 	return "Start radio";
 }
@@ -189,12 +196,22 @@ void MediatekRadio::tune(int freq)
 		return;
 	}
 
-	frequency = freq;
+	setFrequency(freq);
 }
 
 int MediatekRadio::getFrequency() const
 {
 	return frequency;
+}
+
+void MediatekRadio::setFrequency(int freq)
+{
+	if (frequency == freq)
+		return;
+
+	frequency = freq;
+	settings.setValue("frequency", freq);
+	emit frequencyChanged();
 }
 
 int MediatekRadio::seekUp()

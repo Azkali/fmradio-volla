@@ -18,10 +18,13 @@
 #define MEDIATEKRADIO_H
 
 #include <QObject>
+#include <QSettings>
 #include <QString>
 
 class MediatekRadio : public QObject {
 	Q_OBJECT
+	Q_PROPERTY(bool running READ isRadioRunning NOTIFY runningChanged)
+	Q_PROPERTY(int frequency READ getFrequency NOTIFY frequencyChanged)
 
 public:
 	explicit MediatekRadio(QObject *parent = nullptr);
@@ -35,21 +38,27 @@ public:
 	Q_INVOKABLE int seekDown();
 	Q_INVOKABLE bool isRadioRunning() const;
 
+signals:
+	void runningChanged();
+	void frequencyChanged();
+
 private:
 	int seek(bool up);
+	void setFrequency(int freq);
 	void setMute(bool mute);
 	int getRssi();
 	bool isHeadsetConnected();
 	void routeAudio();
 	void restoreAudio();
 
+	QSettings settings;
 	QString paSource;
 	QString paSink;
 	QString savedSourcePort;
 	QString savedSinkPort;
 	QString loopbackModule;
 	bool running = false;
-	int frequency = 10250;
+	int frequency;
 	int fd = -1;
 };
 
