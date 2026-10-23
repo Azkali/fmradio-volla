@@ -24,8 +24,10 @@ int COM_open_dev(const char *pname, int *fd);
 int COM_close_dev(int fd);
 int COM_pwr_up(int fd, int band, int freq);
 int COM_pwr_down(int fd, int type);
-int COM_get_rssi(int fd, int *rssi);
 int COM_tune(int fd, int freq, int band);
 int COM_set_mute(int fd, int mute);
+int COM_pre_search(int fd);
+int COM_restore_search(int fd);
+int COM_Soft_Mute_Tune(int fd, fm_softmute_tune_t *para);
 
 #endif

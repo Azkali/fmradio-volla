@@ -31,7 +31,6 @@
 static const int kBandMin = 8750;
 static const int kBandMax = 10800;
 static const int kStep = 10;
-static const int kSeekRssi = -75;
 static const int kDefaultFrequency = 10250;
 
 // Run pactl with a C locale so its output can be parsed
@@ -255,24 +254,36 @@ int MediatekRadio::step(bool up)
 	return frequency;
 }
 
+// Same as MTK's FM app: soft mute tune every channel until the chip reports a valid one
 int MediatekRadio::seek(bool up)
 {
 	if (!running)
 		return frequency;
 
 	setMute(true);
+	COM_pre_search(fd);
 
-	const int delta = up ? kStep : -kStep;
+	const int channels = (kBandMax - kBandMin) / kStep;
 	int found = frequency;
+	int freq = frequency;
 
-	for (int freq = frequency + delta; freq >= kBandMin && freq <= kBandMax; freq += delta) {
-		if (COM_tune(fd, freq, FM_BAND_UE) == 0 && getRssi() > kSeekRssi) {
+	for (int i = 0; i < channels; i++) {
+		freq = wrapFrequency(freq + (up ? kStep : -kStep));
+
+		fm_softmute_tune_t channel = {};
+		channel.freq = freq;
+		if (COM_Soft_Mute_Tune(fd, &channel) == 0 && channel.valid) {
 			found = freq;
 			break;
 		}
 	}
 
-	tune(found);
+	COM_restore_search(fd);
+
+	// Soft mute tune moves the chip, so tune back even if nothing was found
+	if (COM_tune(fd, found, FM_BAND_UE) < 0)
+		qWarning() << "Failed to tune to" << found;
+	setFrequency(found);
 	setMute(false);
 
 	return frequency;
@@ -283,19 +294,6 @@ void MediatekRadio::setMute(bool mute)
 	int ret = COM_set_mute(fd, mute);
 	if (ret < 0)
 		qWarning() << "Failed to set mute:" << ret;
-}
-
-int MediatekRadio::getRssi()
-{
-	int rssi;
-
-	int ret = COM_get_rssi(fd, &rssi);
-	if (ret < 0) {
-		qWarning() << "Failed to get rssi:" << ret;
-		return -100;
-	}
-
-	return rssi;
 }
 
 bool MediatekRadio::isSpeakerOutput() const

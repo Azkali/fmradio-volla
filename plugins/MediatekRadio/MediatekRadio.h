@@ -53,7 +53,6 @@ private:
 	int step(bool up);
 	void setFrequency(int freq);
 	void setMute(bool mute);
-	int getRssi();
 	bool isHeadsetConnected();
 	void routeAudio();
 	void restoreAudio();
