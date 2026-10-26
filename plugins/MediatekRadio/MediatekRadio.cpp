@@ -16,10 +16,12 @@
 
 #include <QDateTime>
 #include <QDebug>
+#include <QDesktopServices>
 #include <QDir>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStandardPaths>
+#include <QUrl>
 
 #include "MediatekRadio.h"
 #include "common.h"
@@ -117,7 +119,15 @@ MediatekRadio::MediatekRadio(QObject *parent)
 	while (presets.size() < kPresetCount)
 		presets << 0;
 
-	connect(&recorder, &QProcess::stateChanged, this, &MediatekRadio::recordingChanged);
+	connect(&recorder, &QProcess::stateChanged, this, [this](QProcess::ProcessState state) {
+		if (state == QProcess::NotRunning)
+			recordingTimer.stop();
+		emit recordingChanged();
+		emit recordingDurationChanged();
+	});
+
+	recordingTimer.setInterval(1000);
+	connect(&recordingTimer, &QTimer::timeout, this, &MediatekRadio::recordingDurationChanged);
 
 	rdsTimer.setInterval(kRdsInterval);
 	connect(&rdsTimer, &QTimer::timeout, this, &MediatekRadio::readRds);
@@ -558,14 +568,20 @@ bool MediatekRadio::isRecording() const
 	return recorder.state() != QProcess::NotRunning;
 }
 
-// Recordings go to the app data dir
+QString MediatekRadio::recordingsFolder() const
+{
+	const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/recordings";
+	QDir().mkpath(dir);
+
+	return dir;
+}
+
 QString MediatekRadio::startRecording()
 {
 	if (!running || isRecording())
 		return QString();
 
-	const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/recordings";
-	QDir().mkpath(dir);
+	const QString dir = recordingsFolder();
 
 	const QString file = QString("%1/%2_%3MHz.wav")
 		.arg(dir)
@@ -579,6 +595,9 @@ QString MediatekRadio::startRecording()
 		return QString();
 	}
 
+	recordingClock.start();
+	recordingTimer.start();
+
 	return file;
 }
 
@@ -591,4 +610,16 @@ void MediatekRadio::stopRecording()
 	recorder.terminate();
 	if (!recorder.waitForFinished(3000))
 		recorder.kill();
+}
+
+// Seconds since the current recording started, 0 when not recording
+int MediatekRadio::getRecordingDuration() const
+{
+	return isRecording() ? recordingClock.elapsed() / 1000 : 0;
+}
+
+// The file manager handles file:// urls through url-dispatcher
+bool MediatekRadio::openRecordingsFolder()
+{
+	return QDesktopServices::openUrl(QUrl::fromLocalFile(recordingsFolder()));
 }

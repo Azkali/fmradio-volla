@@ -17,6 +17,7 @@
 #ifndef MEDIATEKRADIO_H
 #define MEDIATEKRADIO_H
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QProcess>
 #include <QSettings>
@@ -37,6 +38,7 @@ class MediatekRadio : public QObject {
 	Q_PROPERTY(QString stationName READ getStationName NOTIFY rdsChanged)
 	Q_PROPERTY(QString radioText READ getRadioText NOTIFY rdsChanged)
 	Q_PROPERTY(bool recording READ isRecording NOTIFY recordingChanged)
+	Q_PROPERTY(int recordingDuration READ getRecordingDuration NOTIFY recordingDurationChanged)
 	Q_PROPERTY(QString devicePath READ getDevicePath CONSTANT)
 	Q_PROPERTY(QString chipName READ getChipName NOTIFY runningChanged)
 
@@ -68,6 +70,7 @@ public:
 	Q_INVOKABLE bool isRecording() const;
 	Q_INVOKABLE QString startRecording();
 	Q_INVOKABLE void stopRecording();
+	Q_INVOKABLE bool openRecordingsFolder();
 
 	QVariantList getPresets() const;
 	bool isHeadsetAntenna() const;
@@ -82,6 +85,7 @@ public:
 	QString getRadioText() const;
 	QString getDevicePath() const;
 	QString getChipName() const;
+	int getRecordingDuration() const;
 
 signals:
 	void runningChanged();
@@ -94,6 +98,7 @@ signals:
 	void rdsEnabledChanged();
 	void rdsChanged();
 	void recordingChanged();
+	void recordingDurationChanged();
 
 private:
 	bool powerUp(int freq);
@@ -110,9 +115,12 @@ private:
 	bool isHeadsetConnected();
 	void routeAudio();
 	void restoreAudio();
+	QString recordingsFolder() const;
 
 	QSettings settings;
 	QProcess recorder;
+	QElapsedTimer recordingClock;
+	QTimer recordingTimer;
 	QTimer rdsTimer;
 	QString paSource;
 	QString paSink;
