@@ -38,7 +38,7 @@ static const int kBandMax = 10800;
 static const int kStep = 10;
 static const int kRdsInterval = 100;
 static const int kDefaultFrequency = 10250;
-static const int kPresetCount = 3;
+static const int kPresetCount = 4;
 
 // Run pactl with a C locale so its output can be parsed
 static QString pactl(const QStringList &args)
